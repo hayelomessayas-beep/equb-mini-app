@@ -1,13 +1,440 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Equb Admin Dashboard</title>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+<!DOCTYPE html>
+<html lang="am">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>የባህላዊ ዕቁብ ማኔጅመንት</title>
+  <!-- Telegram WebApp SDK -->
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Swiper.js CSS (ለ Slide ማድረጊያ) -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />
+  
+  <style>
+    :root {
+      --bg-gradient: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #311042 100%);
+      --card-bg: rgba(255, 255, 255, 0.07);
+      --card-border: rgba(255, 255, 255, 0.12);
+      --accent-green: #10b981;
+      --accent-cyan: #06b6d4;
+      --accent-gold: #f59e0b;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background: var(--bg-gradient);
+      color: var(--text-main);
+      min-height: 100vh;
+      padding-bottom: 30px;
+      overflow-x: hidden;
+    }
+
+    /* 1. SPLASH SCREEN STYLES */
+    #splash-screen {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: #0f172a;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+      transition: opacity 0.8s ease, visibility 0.8s ease;
+    }
+
+    .splash-logo {
+      width: 90px;
+      height: 90px;
+      background: linear-gradient(135deg, var(--accent-gold), #f97316);
+      border-radius: 50%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 42px;
+      color: #000;
+      box-shadow: 0 0 30px rgba(245, 158, 11, 0.5);
+      animation: pulse 1.5s infinite alternate;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(0.95); box-shadow: 0 0 15px rgba(245, 158, 11, 0.4); }
+      100% { transform: scale(1.05); box-shadow: 0 0 30px rgba(245, 158, 11, 0.8); }
+    }
+
+    .splash-title {
+      margin-top: 18px;
+      font-size: 22px;
+      font-weight: bold;
+      color: var(--accent-gold);
+    }
+
+    .splash-sub {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .loader {
+      margin-top: 25px;
+      width: 36px;
+      height: 36px;
+      border: 3px solid rgba(255,255,255,0.1);
+      border-top: 3px solid var(--accent-gold);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    /* 2. ONBOARDING MODAL */
+    #welcome-modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.8);
+      backdrop-filter: blur(8px);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 8888;
+      padding: 20px;
+      opacity: 0;
+      visibility: hidden;
+      transition: all 0.5s ease;
+    }
+
+    #welcome-modal.active {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .modal-card {
+      background: rgba(30, 27, 75, 0.95);
+      border: 1px solid var(--card-border);
+      border-radius: 24px;
+      padding: 24px;
+      text-align: center;
+      max-width: 400px;
+      width: 100%;
+    }
+
+    /* MAIN APP LAYOUT */
+    .container {
+      max-width: 500px;
+      margin: 0 auto;
+      padding: 16px;
+    }
+
+    .glass-card {
+      background: var(--card-bg);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 16px;
+      margin-bottom: 16px;
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+    }
+
+    .user-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .badge {
+      font-size: 12px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-weight: bold;
+    }
+    .badge-admin { background: rgba(245, 158, 11, 0.2); color: var(--accent-gold); border: 1px solid var(--accent-gold); }
+    .badge-member { background: rgba(6, 182, 212, 0.2); color: var(--accent-cyan); border: 1px solid var(--accent-cyan); }
+
+    /* SWIPER STYLES */
+    .swiper {
+      width: 100%;
+      padding-bottom: 25px !important;
+    }
+
+    .swiper-pagination-bullet {
+      background: var(--text-muted);
+      opacity: 0.5;
+    }
+
+    .swiper-pagination-bullet-active {
+      background: var(--accent-gold) !important;
+      opacity: 1;
+      width: 20px;
+      border-radius: 10px;
+    }
+
+    .slide-card {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 20px;
+      text-align: center;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 10px;
+      text-align: left;
+    }
+
+    .stat-card h4 {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .stat-card p {
+      font-size: 16px;
+      font-weight: bold;
+    }
+
+    .btn-primary {
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 12px;
+      background: linear-gradient(90deg, var(--accent-gold), #f97316);
+      color: #000;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .member-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .admin-only { display: none; }
+  </style>
+</head>
+<body>
+
+  <!-- 1. SPLASH SCREEN -->
+  <div id="splash-screen">
+    <div class="splash-logo"><i class="fa-solid fa-coins"></i></div>
+    <div class="splash-title">ዕቁብ ማኔጅመንት</div>
+    <div class="splash-sub">ባህላዊ ቁጠባ በዘመናዊ መንገድ</div>
+    <div class="loader"></div>
+  </div>
+
+  <!-- 2. WELCOME MODAL -->
+  <div id="welcome-modal">
+    <div class="modal-card">
+      <div style="font-size: 40px; color: var(--accent-gold); margin-bottom: 10px;"><i class="fa-solid fa-handshake"></i></div>
+      <h2 style="margin-bottom: 10px; color: var(--accent-gold);" id="welcome-title">እንኳን ደህና መጡ!</h2>
+      <p style="font-size: 14px; color: var(--text-muted); line-height: 1.6; margin-bottom: 20px;">
+        ካርዶቹን ወደ ግራና ወደ ቀኝ **Slide** በማድረግ የዕቁብ ዓይነቶችንና መረጃዎችን መመልከት ይችላሉ!
+      </p>
+      <button class="btn-primary" onclick="closeWelcomeModal()">ተረድቻለሁ 🚀</button>
+    </div>
+  </div>
+
+  <!-- MAIN APP CONTAINER -->
+  <div class="container">
+
+    <!-- Header / User Info -->
+    <div class="glass-card user-header">
+      <div>
+        <h3 id="user-name">👤 ሰላም...</h3>
+        <span style="font-size: 12px; color: var(--text-muted);" id="user-id-text">ID: ---</span>
+      </div>
+      <span id="role-badge" class="badge badge-member">Member View</span>
+    </div>
+
+    <!-- 🔄 SLIDER CONTAINER (SWIPER) -->
+    <div class="swiper mySwiper">
+      <div class="swiper-wrapper">
+        
+        <!-- Slide 1: የቀን ዕቁብ -->
+        <div class="swiper-slide">
+          <div class="slide-card">
+            <span style="color: var(--accent-gold); font-size: 12px; font-weight: bold;">☀️ 1ኛ ካርድ</span>
+            <h2 style="margin: 8px 0; color: var(--accent-gold);">የቀን ዕቁብ</h2>
+            <div class="stats-grid">
+              <div class="stat-card">
+                <h4>ጠቅላላ አባላት</h4>
+                <p>12 አባላት</p>
+              </div>
+              <div class="stat-card">
+                <h4>የተሰበሰበ ብር</h4>
+                <p style="color: var(--accent-green);">12,000 ETB</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Slide 2: የሳምንት ዕቁብ -->
+        <div class="swiper-slide">
+          <div class="slide-card">
+            <span style="color: var(--accent-cyan); font-size: 12px; font-weight: bold;">📅 2ኛ ካርድ</span>
+            <h2 style="margin: 8px 0; color: var(--accent-cyan);">የሳምንት ዕቁብ</h2>
+            <div class="stats-grid">
+              <div class="stat-card">
+                <h4>ጠቅላላ አባላት</h4>
+                <p>25 አባላት</p>
+              </div>
+              <div class="stat-card">
+                <h4>የተሰበሰበ ብር</h4>
+                <p style="color: var(--accent-green);">50,000 ETB</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Slide 3: የወር ዕቁብ -->
+        <div class="swiper-slide">
+          <div class="slide-card">
+            <span style="color: var(--accent-green); font-size: 12px; font-weight: bold;">🗓️ 3ኛ ካርድ</span>
+            <h2 style="margin: 8px 0; color: var(--accent-green);">የወር ዕቁብ</h2>
+            <div class="stats-grid">
+              <div class="stat-card">
+                <h4>ጠቅላላ አባላት</h4>
+                <p>50 አባላት</p>
+              </div>
+              <div class="stat-card">
+                <h4>የተሰበሰበ ብር</h4>
+                <p style="color: var(--accent-green);">200,000 ETB</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+      <!-- Dots Pagination -->
+      <div class="swiper-pagination"></div>
+    </div>
+
+    <!-- Admin Control Panel -->
+    <div class="glass-card admin-only" id="admin-panel">
+      <h3 style="margin-bottom: 12px; color: var(--accent-gold);"><i class="fa-solid fa-user-shield"></i> የአስተዳዳሪ መቆጣጠሪያ</h3>
+      <button class="btn-primary" onclick="drawLottery()">✨ ዕጣ አውጣ</button>
+      <div id="winner-display" style="display:none; text-align:center; margin-top:15px; padding:15px; border:1px dashed var(--accent-gold); border-radius:12px;">
+        <h4 style="color: var(--accent-gold);">🎉 አሸናፊ!</h4>
+        <h2 id="winner-name" style="color:#fff; margin:5px 0;">---</h2>
+      </div>
+    </div>
+
+    <!-- Members List -->
+    <div class="glass-card">
+      <h3 style="margin-bottom: 12px;"><i class="fa-solid fa-users"></i> የአባላት ዝርዝር</h3>
+      <div class="member-item">
+        <div>
+          <strong>አበበ ከበደ</strong>
+          <div style="font-size: 11px; color: var(--text-muted);">+251 91 123 4567</div>
+        </div>
+        <span style="color: var(--accent-green); font-size: 13px;"><i class="fa-solid fa-circle-check"></i> ከፍሏል</span>
+      </div>
+      <div class="member-item">
+        <div>
+          <strong>ላእከ ማርያም</strong>
+          <div style="font-size: 11px; color: var(--text-muted);">+251 92 987 6543</div>
+        </div>
+        <span style="color: #f43f5e; font-size: 13px;"><i class="fa-solid fa-circle-xmark"></i> አልከፈለም</span>
+      </div>
+    </div>
+
+    <!-- Payment Trigger -->
+    <div class="glass-card" style="text-align: center;">
+      <button class="btn-primary" style="background: linear-gradient(90deg, var(--accent-cyan), #3b82f6); color: #fff;" onclick="alert('የክፍያ ገጽ...')">
+        💳 ክፍያ ፈፅም
+      </button>
+    </div>
+
+  </div>
+
+  <!-- Swiper.js JS (ለ Slide ስራው አስፈላጊ ነው) -->
+  <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
+
+  <script>
+    // 🔴 1. የአንተን Telegram ID እዚህ አስገባ!
+    const ADMIN_TELEGRAM_ID =8738798344 ;
+
+    // Telegram WebApp Initialization
+    const tg = window.Telegram.WebApp;
+    tg.expand();
+
+    // Swiper Slide Initialization
+    const swiper = new Swiper('.mySwiper', {
+      loop: true,
+      spaceBetween: 16,
+      pagination: {
+        el: '.swiper-pagination',
+        clickable: true,
+      },
+    });
+
+    // Splash Screen Handler
+    window.addEventListener('load', () => {
+      setTimeout(() => {
+        const splash = document.getElementById('splash-screen');
+        splash.style.opacity = '0';
+        splash.style.visibility = 'hidden';
+        
+        if(!localStorage.getItem('equb_visited')) {
+          document.getElementById('welcome-modal').classList.add('active');
+        }
+      }, 2000);
+    });
+
+    function closeWelcomeModal() {
+      document.getElementById('welcome-modal').classList.remove('active');
+      localStorage.setItem('equb_visited', 'true');
+    }
+
+    // Get Telegram User Data
+    const user = tg.initDataUnsafe?.user;
+
+    if (user) {
+      document.getElementById('user-name').innerText = `👤 ሰላም, ${user.first_name}`;
+      document.getElementById('user-id-text').innerText = `ID: ${user.id}`;
+      document.getElementById('welcome-title').innerText = `ሰላም ${user.first_name}!`;
+
+      if (user.id === ADMIN_TELEGRAM_ID) {
+        document.getElementById('role-badge').className = "badge badge-admin";
+        document.getElementById('role-badge').innerText = "Admin View";
+        document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'block');
+      }
+    }
+
+    function drawLottery() {
+      const winnerDisplay = document.getElementById('winner-display');
+      const winnerName = document.getElementById('winner-name');
+      winnerDisplay.style.display = 'block';
+      winnerName.innerText = "ዕጣ እየወጣ ነው...";
+
+      setTimeout(() => {
+        const members = ["አበበ ከበደ", "ላእከ ማርያም", "ሳራ ተስፋዬ"];
+        winnerName.innerText = members[Math.floor(Math.random() * members.length)];
+      }, 1800);
+    }
+  </script>
+</body>
 </html>
