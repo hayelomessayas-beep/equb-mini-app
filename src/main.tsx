@@ -1,14 +1,30 @@
 import React, { useState, useEffect } from 'react'
 import ReactDOM from 'react-dom/client'
 
+interface EqubType {
+  id: string;
+  name: string;
+  amount: number;
+  cycle: string;
+}
+
+interface PaymentReceipt {
+  id: number;
+  memberName: string;
+  equbType: string;
+  amount: number;
+  refNumber: string;
+  status: 'pending' | 'approved';
+  date: string;
+}
+
 interface Member {
   id: number;
   name: string;
   phone: string;
-  amount: number;
+  equbTypeId: string;
   paid: boolean;
   won: boolean;
-  telegramId?: string;
 }
 
 declare global {
@@ -28,20 +44,38 @@ declare global {
   }
 }
 
+const EQUB_TYPES: EqubType[] = [
+  { id: 'daily', name: 'የቀን ዕቁብ', amount: 100, cycle: 'በየቀኑ' },
+  { id: 'weekly', name: 'የሳምንት ዕቁብ', amount: 1000, cycle: 'በየሳምንቱ' },
+  { id: 'monthly', name: 'የወር ዕቁብ', amount: 5000, cycle: 'በየወሩ' },
+];
+
 const App = () => {
   const [isAdmin, setIsAdmin] = useState<boolean>(true);
   const [currentUser, setCurrentUser] = useState<string>('አባል');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'register' | 'pay' | 'history'>('dashboard');
+
+  const [selectedEqub, setSelectedEqub] = useState<string>('weekly');
 
   const [members, setMembers] = useState<Member[]>([
-    { id: 1, name: 'አበበ ከበደ', phone: '0911223344', amount: 2000, paid: true, won: false },
-    { id: 2, name: 'ማርታ አለሙ', phone: '0922334455', amount: 2000, paid: true, won: false },
-    { id: 3, name: 'ዮሐንስ ተስፋዬ', phone: '0933445566', amount: 2000, paid: false, won: false },
-    { id: 4, name: 'ሰላማዊት ደስታ', phone: '0944556677', amount: 2000, paid: true, won: true },
+    { id: 1, name: 'አበበ ከበደ', phone: '0911223344', equbTypeId: 'weekly', paid: true, won: false },
+    { id: 2, name: 'ማርታ አለሙ', phone: '0922334455', equbTypeId: 'weekly', paid: true, won: false },
+    { id: 3, name: 'ዮሐንስ ተስፋዬ', phone: '0933445566', equbTypeId: 'weekly', paid: false, won: false },
+    { id: 4, name: 'ሰላማዊት ደስታ', phone: '0944556677', equbTypeId: 'weekly', paid: true, won: true },
   ]);
 
-  const [newName, setNewName] = useState('');
-  const [newPhone, setNewPhone] = useState('');
-  const [newAmount, setNewAmount] = useState('2000');
+  const [receipts, setReceipts] = useState<PaymentReceipt[]>([
+    { id: 101, memberName: 'ዮሐንስ ተስፋዬ', equbType: 'የሳምንት ዕቁብ', amount: 1000, refNumber: 'TX123456', status: 'pending', date: 'ዛሬ' }
+  ]);
+
+  // Form states
+  const [regName, setRegName] = useState('');
+  const [regPhone, setRegPhone] = useState('');
+  const [regEqub, setRegEqub] = useState('weekly');
+
+  const [payName, setPayName] = useState('');
+  const [payRef, setPayRef] = useState('');
+
   const [isSpinning, setIsSpinning] = useState(false);
   const [winner, setWinner] = useState<Member | null>(null);
 
@@ -49,37 +83,58 @@ const App = () => {
     const tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
     if (tgUser) {
       setCurrentUser(tgUser.first_name);
+      setRegName(tgUser.first_name);
+      setPayName(tgUser.first_name);
     }
   }, []);
 
-  const totalCollected = members.reduce((acc, m) => acc + (m.paid ? m.amount : 0), 0);
-  const totalTarget = members.reduce((acc, m) => acc + m.amount, 0);
-  const progress = Math.round((totalCollected / totalTarget) * 100) || 0;
+  const currentEqubInfo = EQUB_TYPES.find(e => e.id === selectedEqub) || EQUB_TYPES[1];
+  const filteredMembers = members.filter(m => m.equbTypeId === selectedEqub);
 
-  const togglePaid = (id: number) => {
-    if (!isAdmin) return;
-    setMembers(members.map(m => m.id === id ? { ...m, paid: !m.paid } : m));
-  };
+  const totalCollected = filteredMembers.reduce((acc, m) => acc + (m.paid ? currentEqubInfo.amount : 0), 0);
+  const totalTarget = filteredMembers.length * currentEqubInfo.amount;
+  const progress = Math.round((totalCollected / (totalTarget || 1)) * 100) || 0;
 
-  const handleAddMember = (e: React.FormEvent) => {
+  const handleRegister = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newName || !isAdmin) return;
-    const newMember: Member = {
+    if (!regName) return;
+    const newM: Member = {
       id: Date.now(),
-      name: newName,
-      phone: newPhone || '0900000000',
-      amount: Number(newAmount) || 2000,
+      name: regName,
+      phone: regPhone || '0900000000',
+      equbTypeId: regEqub,
       paid: false,
       won: false
     };
-    setMembers([...members, newMember]);
-    setNewName('');
-    setNewPhone('');
+    setMembers([...members, newM]);
+    alert('በተ his መዝግበዋል! አሁን ክፍያ መፈጸም ይችላሉ።');
+    setActiveTab('pay');
+  };
+
+  const handlePaymentSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!payName || !payRef) return;
+    const newR: PaymentReceipt = {
+      id: Date.now(),
+      memberName: payName,
+      equbType: currentEqubInfo.name,
+      amount: currentEqubInfo.amount,
+      refNumber: payRef,
+      status: 'pending',
+      date: 'አሁን'
+    };
+    setReceipts([...receipts, newR]);
+    setPayRef('');
+    alert('የክፍያ ደረሰኝዎ ለAdmin ተልኳል! ሲረጋገጥ ክፍያዎ ይቀየራል።');
+  };
+
+  const approveReceipt = (id: number, memberName: string) => {
+    setReceipts(receipts.map(r => r.id === id ? { ...r, status: 'approved' } : r));
+    setMembers(members.map(m => m.name === memberName ? { ...m, paid: true } : m));
   };
 
   const drawLottery = () => {
-    if (!isAdmin) return;
-    const eligible = members.filter(m => !m.won && m.paid);
+    const eligible = filteredMembers.filter(m => !m.won && m.paid);
     if (eligible.length === 0) {
       alert('ዕጣ የሚወጣላቸው ብቁ አባላት (የከፈሉና ያልወጣላቸው) የሉም!');
       return;
@@ -98,154 +153,189 @@ const App = () => {
   return (
     <div style={styles.container}>
       <div style={styles.glassCard}>
-        
-        {/* Role Switcher Bar */}
-        <div style={styles.roleBar}>
+
+        {/* Top User Bar */}
+        <div style={styles.topBar}>
           <span style={{ fontSize: '12px', color: '#94a3b8' }}>
-            👤 ሰላም {currentUser} ({isAdmin ? 'አስተዳዳሪ' : 'አባል'})
+            👤 ሰላም {currentUser} ({isAdmin ? 'Admin' : 'Member'})
           </span>
-          <button 
-            onClick={() => setIsAdmin(!isAdmin)} 
-            style={styles.switchBtn}
-          >
-            ወደ {isAdmin ? 'አባል View' : 'Admin View'} ቀይር
+          <button onClick={() => setIsAdmin(!isAdmin)} style={styles.switchBtn}>
+            {isAdmin ? 'ወደ Member View' : 'ወደ Admin View'}
           </button>
         </div>
 
-        {/* Header */}
-        <div style={styles.header}>
-          <span style={styles.badge}>
-            {isAdmin ? '⚙️ ADMIN DASHBOARD' : '👥 MEMBER PORTAL'}
-          </span>
-          <h1 style={styles.title}>🔄 የዲጂታል ዕቁብ አስተዳደር</h1>
-          <p style={styles.subtitle}>
-            {isAdmin ? 'የአባላትን ክፍያና ዕጣ ማውጫ ይቆጣጠሩ' : 'የዕቁቡን እንቅስቃሴ እና የክፍያ ሁኔታዎን ይመልከቱ'}
-          </p>
-        </div>
-
-        {/* Stats Section */}
-        <div style={styles.statsGrid}>
-          <div style={styles.statBox}>
-            <p style={styles.statLabel}>ጠቅላላ አባላት</p>
-            <h2 style={styles.statValue}>{members.length}</h2>
-          </div>
-          <div style={styles.statBox}>
-            <p style={styles.statLabel}>የተሰበሰበ ገንዘብ</p>
-            <h2 style={{ ...styles.statValue, color: '#4ade80' }}>{totalCollected.toLocaleString()} ብር</h2>
-          </div>
-        </div>
-
-        {/* Progress Bar */}
-        <div style={styles.progressSection}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-            <span style={{ fontSize: '13px', color: '#cbd5e1' }}>የክፍያ ሂደት</span>
-            <span style={{ fontSize: '13px', color: '#38bdf8', fontWeight: 'bold' }}>{progress}%</span>
-          </div>
-          <div style={styles.progressBarBg}>
-            <div style={{ ...styles.progressBarFill, width: `${progress}%` }}></div>
-          </div>
-        </div>
-
-        {/* Lottery Section - Admin only gets button, Members only see result */}
-        <div style={styles.lotteryBox}>
-          <h3 style={styles.sectionTitle}>🎲 የዲጂታል ዕጣ ማውጫ</h3>
-          
-          {isAdmin ? (
-            <button 
-              onClick={drawLottery} 
-              disabled={isSpinning} 
+        {/* Equb Selector */}
+        <div style={styles.equbSelector}>
+          {EQUB_TYPES.map(eq => (
+            <button
+              key={eq.id}
+              onClick={() => setSelectedEqub(eq.id)}
               style={{
-                ...styles.spinButton,
-                opacity: isSpinning ? 0.6 : 1,
-                cursor: isSpinning ? 'not-allowed' : 'pointer'
+                ...styles.equbTab,
+                background: selectedEqub === eq.id ? '#38bdf8' : 'rgba(255, 255, 255, 0.05)',
+                color: selectedEqub === eq.id ? '#0f172a' : '#cbd5e1',
+                fontWeight: selectedEqub === eq.id ? 'bold' : 'normal'
               }}
             >
-              {isSpinning ? 'ዕጣ እየወጣ ነው...' : '✨ ዕጣ አውጣ'}
+              {eq.name}
             </button>
-          ) : (
-            <p style={{ fontSize: '13px', color: '#94a3b8', margin: '8px 0' }}>
-              ℹ️ ዕጣ የሚወጣው በእቁብ ሰብሳቢው (Admin) ብቻ ነው።
-            </p>
-          )}
-
-          {winner && (
-            <div style={styles.winnerCard}>
-              <p style={{ margin: 0, fontSize: '14px', color: '#e2e8f0' }}>🎉 የዚህ ሳምንት አሸናፊ!</p>
-              <h2 style={{ margin: '5px 0', color: '#facc15' }}>{winner.name}</h2>
-              <p style={{ margin: 0, fontSize: '13px', color: '#94a3b8' }}>እንኳን ደስ አለዎት!</p>
-            </div>
-          )}
+          ))}
         </div>
 
-        {/* Add Member Form - ADMIN ONLY */}
-        {isAdmin && (
+        {/* Navigation Bar */}
+        <div style={styles.navBar}>
+          <button onClick={() => setActiveTab('dashboard')} style={activeTab === 'dashboard' ? styles.activeNav : styles.navBtn}>📊 ዳሽቦርድ</button>
+          <button onClick={() => setActiveTab('register')} style={activeTab === 'register' ? styles.activeNav : styles.navBtn}>📝 መመዝገቢያ</button>
+          <button onClick={() => setActiveTab('pay')} style={activeTab === 'pay' ? styles.activeNav : styles.navBtn}>💳 ክፍያ ፈፅም</button>
+          <button onClick={() => setActiveTab('history')} style={activeTab === 'history' ? styles.activeNav : styles.navBtn}>🏆 አሸናፊዎች</button>
+        </div>
+
+        {/* TAB 1: DASHBOARD */}
+        {activeTab === 'dashboard' && (
+          <div>
+            <div style={styles.statsGrid}>
+              <div style={styles.statBox}>
+                <p style={styles.statLabel}>የ{currentEqubInfo.name} አባላት</p>
+                <h2 style={styles.statValue}>{filteredMembers.length}</h2>
+              </div>
+              <div style={styles.statBox}>
+                <p style={styles.statLabel}>የተሰበሰበ ገንዘብ</p>
+                <h2 style={{ ...styles.statValue, color: '#4ade80' }}>{totalCollected.toLocaleString()} ብር</h2>
+              </div>
+            </div>
+
+            <div style={styles.progressSection}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                <span style={{ fontSize: '12px', color: '#cbd5e1' }}>የክፍያ ሂደት</span>
+                <span style={{ fontSize: '12px', color: '#38bdf8', fontWeight: 'bold' }}>{progress}%</span>
+              </div>
+              <div style={styles.progressBarBg}>
+                <div style={{ ...styles.progressBarFill, width: `${progress}%` }}></div>
+              </div>
+            </div>
+
+            {/* Lottery Section */}
+            <div style={styles.lotteryBox}>
+              <h3 style={styles.sectionTitle}>🎲 የዲጂታል ዕጣ ማውጫ ({currentEqubInfo.name})</h3>
+              {isAdmin ? (
+                <button onClick={drawLottery} disabled={isSpinning} style={styles.spinButton}>
+                  {isSpinning ? 'ዕጣ እየወጣ ነው...' : '✨ ዕጣ አውጣ'}
+                </button>
+              ) : (
+                <p style={{ fontSize: '12px', color: '#94a3b8' }}>ℹ️ ዕጣ የሚወጣው በዕቁብ ሰብሳቢው (Admin) ብቻ ነው።</p>
+              )}
+
+              {winner && (
+                <div style={styles.winnerCard}>
+                  <p style={{ margin: 0, fontSize: '13px', color: '#e2e8f0' }}>🎉 የዚህ ዙር አሸናፊ!</p>
+                  <h2 style={{ margin: '4px 0', color: '#facc15' }}>{winner.name}</h2>
+                  <p style={{ margin: 0, fontSize: '12px', color: '#94a3b8' }}>እንኳን ደስ አለዎት!</p>
+                </div>
+              )}
+            </div>
+
+            {/* Admin Approvals Section */}
+            {isAdmin && receipts.filter(r => r.status === 'pending').length > 0 && (
+              <div style={{ ...styles.section, border: '1px solid #f59e0b', padding: '12px', borderRadius: '12px' }}>
+                <h3 style={{ ...styles.sectionTitle, color: '#f59e0b' }}>⚠️ ያልተረጋገጡ ክፍያዎች (Pending)</h3>
+                {receipts.filter(r => r.status === 'pending').map(r => (
+                  <div key={r.id} style={styles.receiptCard}>
+                    <div>
+                      <p style={{ margin: 0, fontWeight: 'bold' }}>{r.memberName}</p>
+                      <p style={{ margin: 0, fontSize: '11px', color: '#94a3b8' }}>Ref: {r.refNumber} • {r.amount} ብር</p>
+                    </div>
+                    <button onClick={() => approveReceipt(r.id, r.memberName)} style={styles.approveBtn}>Approve</button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Members List */}
+            <div style={styles.section}>
+              <h3 style={styles.sectionTitle}>👥 የአባላት ሁኔታ</h3>
+              <div style={styles.memberList}>
+                {filteredMembers.map(m => (
+                  <div key={m.id} style={styles.memberCard}>
+                    <div>
+                      <h4 style={{ margin: 0, fontSize: '14px' }}>{m.name}</h4>
+                      <p style={{ margin: 0, fontSize: '11px', color: '#94a3b8' }}>{m.phone}</p>
+                    </div>
+                    <span style={{ color: m.paid ? '#4ade80' : '#f87171', fontWeight: 'bold', fontSize: '12px' }}>
+                      {m.paid ? '✓ ከፍሏል' : '✗ አልከፈለም'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 2: REGISTER */}
+        {activeTab === 'register' && (
           <div style={styles.section}>
-            <h3 style={styles.sectionTitle}>➕ አዲስ አባል መመዝገቢያ</h3>
-            <form onSubmit={handleAddMember} style={styles.form}>
-              <input 
-                type="text" 
-                placeholder="የአባል ስም" 
-                value={newName} 
-                onChange={e => setNewName(e.target.value)} 
-                style={styles.input} 
-              />
-              <input 
-                type="text" 
-                placeholder="ስልክ ቁጥር" 
-                value={newPhone} 
-                onChange={e => setNewPhone(e.target.value)} 
-                style={styles.input} 
-              />
-              <input 
-                type="number" 
-                placeholder="የዕቁብ መጠን (ብር)" 
-                value={newAmount} 
-                onChange={e => setNewAmount(e.target.value)} 
-                style={styles.input} 
-              />
-              <button type="submit" style={styles.submitBtn}>መዝግብ</button>
+            <h3 style={styles.sectionTitle}>📝 ለዕቁብ መመዝገቢያ</h3>
+            <form onSubmit={handleRegister} style={styles.form}>
+              <label style={styles.label}>የአባል ስም</label>
+              <input type="text" value={regName} onChange={e => setRegName(e.target.value)} style={styles.input} required />
+              
+              <label style={styles.label}>ስልክ ቁጥር</label>
+              <input type="text" placeholder="09..." value={regPhone} onChange={e => setRegPhone(e.target.value)} style={styles.input} required />
+
+              <label style={styles.label}>የዕቁብ አይነት መረጣ</label>
+              <select value={regEqub} onChange={e => setRegEqub(e.target.value)} style={styles.input}>
+                {EQUB_TYPES.map(e => (
+                  <option key={e.id} value={e.id} style={{ color: '#000' }}>{e.name} ({e.amount} ብር {e.cycle})</option>
+                ))}
+              </select>
+
+              <button type="submit" style={styles.submitBtn}>ተመዝገብ</button>
             </form>
           </div>
         )}
 
-        {/* Members List */}
-        <div style={styles.section}>
-          <h3 style={styles.sectionTitle}>👥 የአባላት ዝርዝር እና የክፍያ ሁኔታ</h3>
-          <div style={styles.memberList}>
-            {members.map(m => (
-              <div key={m.id} style={styles.memberCard}>
-                <div>
-                  <h4 style={{ margin: '0 0 4px 0', fontSize: '15px', color: '#f8fafc' }}>{m.name}</h4>
-                  <p style={{ margin: 0, fontSize: '12px', color: '#94a3b8' }}>{m.phone} • {m.amount.toLocaleString()} ብር</p>
-                  {m.won && <span style={styles.wonBadge}>ዕጣ ወጥቶለታል</span>}
-                </div>
-                
-                {isAdmin ? (
-                  <button 
-                    onClick={() => togglePaid(m.id)} 
-                    style={{
-                      ...styles.payBadge,
-                      background: m.paid ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)',
-                      color: m.paid ? '#4ade80' : '#f87171',
-                      border: `1px solid ${m.paid ? '#22c55e' : '#ef4444'}`
-                    }}
-                  >
-                    {m.paid ? 'ከፍሏል' : 'አልከፈለም'}
-                  </button>
-                ) : (
-                  <span 
-                    style={{
-                      ...styles.payBadgeReadOnly,
-                      color: m.paid ? '#4ade80' : '#f87171',
-                    }}
-                  >
-                    {m.paid ? '✓ ከፍሏል' : '✗ አልከፈለም'}
-                  </span>
-                )}
-              </div>
-            ))}
+        {/* TAB 3: PAY */}
+        {activeTab === 'pay' && (
+          <div style={styles.section}>
+            <h3 style={styles.sectionTitle}>💳 ክፍያ ፈፅም ({currentEqubInfo.name})</h3>
+            <div style={styles.bankInfoBox}>
+              <p style={{ margin: '0 0 6px 0', fontSize: '13px', fontWeight: 'bold' }}>የክፍያ አማራጮች፦</p>
+              <p style={{ margin: 0, fontSize: '12px' }}>📱 <b>Telebirr:</b> 0911223344 (እቁብ ሰብሳቢ)</p>
+              <p style={{ margin: '4px 0 0 0', fontSize: '12px' }}>🏦 <b>CBE:</b> 1000123456789</p>
+              <p style={{ margin: '6px 0 0 0', fontSize: '12px', color: '#facc15' }}>የሚከፍሉት መጠን፦ <b>{currentEqubInfo.amount} ብር</b></p>
+            </div>
+
+            <form onSubmit={handlePaymentSubmit} style={styles.form}>
+              <label style={styles.label}>የከፋዩ ስም</label>
+              <input type="text" value={payName} onChange={e => setPayName(e.target.value)} style={styles.input} required />
+
+              <label style={styles.label}>የክፍያ ማረጋገጫ ቁጥር (Transaction Ref / ID)</label>
+              <input type="text" placeholder="ለምሳሌ፦ TX123456" value={payRef} onChange={e => setPayRef(e.target.value)} style={styles.input} required />
+
+              <button type="submit" style={styles.submitBtn}>የክፍያ ደረሰኝ ላክ</button>
+            </form>
           </div>
-        </div>
+        )}
+
+        {/* TAB 4: HISTORY */}
+        {activeTab === 'history' && (
+          <div style={styles.section}>
+            <h3 style={styles.sectionTitle}>🏆 የዕጣ አሸናፊዎች ታሪክ</h3>
+            <div style={styles.memberList}>
+              {members.filter(m => m.won).map(m => (
+                <div key={m.id} style={styles.memberCard}>
+                  <div>
+                    <h4 style={{ margin: 0, color: '#facc15' }}>👑 {m.name}</h4>
+                    <p style={{ margin: 0, fontSize: '11px', color: '#94a3b8' }}>የ{EQUB_TYPES.find(e => e.id === m.equbTypeId)?.name}</p>
+                  </div>
+                  <span style={{ fontSize: '11px', background: 'rgba(250, 204, 21, 0.2)', color: '#facc15', padding: '2px 8px', borderRadius: '4px' }}>አሸናፊ</span>
+                </div>
+              ))}
+              {members.filter(m => m.won).length === 0 && (
+                <p style={{ textAlign: 'center', fontSize: '12px', color: '#94a3b8' }}>እስካሁን ዕጣ የወጣለት አባል የለም።</p>
+              )}
+            </div>
+          </div>
+        )}
 
       </div>
     </div>
@@ -256,11 +346,11 @@ const styles: Record<string, React.CSSProperties> = {
   container: {
     minHeight: '100vh',
     background: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #311042 100%)',
-    padding: '16px',
+    padding: '12px',
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'flex-start',
-    fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    fontFamily: 'system-ui, -apple-system, sans-serif',
     boxSizing: 'border-box'
   },
   glassCard: {
@@ -268,82 +358,94 @@ const styles: Record<string, React.CSSProperties> = {
     maxWidth: '480px',
     background: 'rgba(255, 255, 255, 0.05)',
     backdropFilter: 'blur(16px)',
-    WebkitBackdropFilter: 'blur(16px)',
-    borderRadius: '24px',
-    padding: '20px',
+    borderRadius: '20px',
+    padding: '16px',
     border: '1px solid rgba(255, 255, 255, 0.1)',
-    boxShadow: '0 20px 40px rgba(0, 0, 0, 0.4)',
     color: '#fff'
   },
-  roleBar: {
+  topBar: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingBottom: '12px',
-    marginBottom: '16px',
-    borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
+    marginBottom: '12px'
   },
   switchBtn: {
-    background: 'rgba(255, 255, 255, 0.1)',
-    border: '1px solid rgba(255, 255, 255, 0.2)',
+    background: 'rgba(56, 189, 248, 0.2)',
+    border: '1px solid #38bdf8',
     color: '#38bdf8',
-    padding: '4px 10px',
-    borderRadius: '8px',
-    fontSize: '11px',
+    padding: '4px 8px',
+    borderRadius: '6px',
+    fontSize: '10px',
     fontWeight: 'bold',
     cursor: 'pointer'
   },
-  header: {
-    textAlign: 'center',
-    marginBottom: '20px'
+  equbSelector: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr 1fr',
+    gap: '6px',
+    marginBottom: '12px'
   },
-  badge: {
-    background: 'linear-gradient(90deg, #38bdf8, #818cf8)',
-    padding: '4px 12px',
-    borderRadius: '20px',
-    fontSize: '10px',
-    fontWeight: 'bold',
-    letterSpacing: '1px'
+  equbTab: {
+    padding: '8px 4px',
+    borderRadius: '8px',
+    border: 'none',
+    fontSize: '11px',
+    cursor: 'pointer'
   },
-  title: {
-    fontSize: '22px',
-    margin: '10px 0 4px 0',
-    color: '#f8fafc'
+  navBar: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr 1fr 1fr',
+    gap: '4px',
+    marginBottom: '16px',
+    borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+    paddingBottom: '8px'
   },
-  subtitle: {
-    fontSize: '12px',
+  navBtn: {
+    background: 'transparent',
+    border: 'none',
     color: '#94a3b8',
-    margin: 0
+    fontSize: '11px',
+    padding: '6px 2px',
+    cursor: 'pointer'
+  },
+  activeNav: {
+    background: 'rgba(255, 255, 255, 0.1)',
+    border: 'none',
+    color: '#fff',
+    fontWeight: 'bold',
+    borderRadius: '6px',
+    fontSize: '11px',
+    padding: '6px 2px'
   },
   statsGrid: {
     display: 'grid',
     gridTemplateColumns: '1fr 1fr',
-    gap: '12px',
-    marginBottom: '16px'
+    gap: '10px',
+    marginBottom: '12px'
   },
   statBox: {
     background: 'rgba(255, 255, 255, 0.03)',
-    padding: '12px',
-    borderRadius: '16px',
+    padding: '10px',
+    borderRadius: '12px',
     border: '1px solid rgba(255, 255, 255, 0.05)',
     textAlign: 'center'
   },
   statLabel: {
     margin: '0 0 4px 0',
-    fontSize: '11px',
+    fontSize: '10px',
     color: '#94a3b8'
   },
   statValue: {
     margin: 0,
-    fontSize: '18px',
+    fontSize: '16px',
     fontWeight: 'bold'
   },
   progressSection: {
-    marginBottom: '20px'
+    marginBottom: '16px'
   },
   progressBarBg: {
     width: '100%',
-    height: '8px',
+    height: '6px',
     background: 'rgba(255, 255, 255, 0.1)',
     borderRadius: '10px',
     overflow: 'hidden'
@@ -351,40 +453,40 @@ const styles: Record<string, React.CSSProperties> = {
   progressBarFill: {
     height: '100%',
     background: 'linear-gradient(90deg, #38bdf8, #4ade80)',
-    borderRadius: '10px',
-    transition: 'width 0.4s ease'
+    borderRadius: '10px'
   },
   lotteryBox: {
     background: 'rgba(129, 140, 248, 0.1)',
     border: '1px solid rgba(129, 140, 248, 0.2)',
-    borderRadius: '16px',
-    padding: '16px',
+    borderRadius: '14px',
+    padding: '12px',
     textAlign: 'center',
-    marginBottom: '20px'
+    marginBottom: '16px'
   },
   spinButton: {
     width: '100%',
-    padding: '12px',
-    borderRadius: '12px',
+    padding: '10px',
+    borderRadius: '10px',
     border: 'none',
     background: 'linear-gradient(90deg, #6366f1, #a855f7)',
     color: '#fff',
     fontWeight: 'bold',
-    fontSize: '15px'
+    fontSize: '13px',
+    cursor: 'pointer'
   },
   winnerCard: {
-    marginTop: '12px',
-    padding: '12px',
+    marginTop: '10px',
+    padding: '10px',
     background: 'rgba(250, 204, 21, 0.15)',
     border: '1px solid rgba(250, 204, 21, 0.3)',
-    borderRadius: '12px'
+    borderRadius: '10px'
   },
   section: {
-    marginBottom: '20px'
+    marginBottom: '16px'
   },
   sectionTitle: {
-    fontSize: '15px',
-    margin: '0 0 12px 0',
+    fontSize: '13px',
+    margin: '0 0 10px 0',
     color: '#cbd5e1'
   },
   form: {
@@ -392,58 +494,69 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
     gap: '8px'
   },
+  label: {
+    fontSize: '11px',
+    color: '#94a3b8'
+  },
   input: {
-    padding: '10px 14px',
-    borderRadius: '10px',
+    padding: '8px 12px',
+    borderRadius: '8px',
     border: '1px solid rgba(255, 255, 255, 0.1)',
     background: 'rgba(0, 0, 0, 0.2)',
     color: '#fff',
-    fontSize: '13px',
+    fontSize: '12px',
     outline: 'none'
   },
   submitBtn: {
     padding: '10px',
-    borderRadius: '10px',
+    borderRadius: '8px',
     border: 'none',
     background: '#38bdf8',
     color: '#0f172a',
     fontWeight: 'bold',
-    fontSize: '14px',
+    fontSize: '13px',
+    marginTop: '6px',
     cursor: 'pointer'
   },
   memberList: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '8px'
+    gap: '6px'
   },
   memberCard: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: '12px',
+    padding: '10px',
     background: 'rgba(255, 255, 255, 0.03)',
-    borderRadius: '12px',
+    borderRadius: '10px',
     border: '1px solid rgba(255, 255, 255, 0.05)'
   },
-  wonBadge: {
-    display: 'inline-block',
-    fontSize: '10px',
-    background: 'rgba(250, 204, 21, 0.2)',
-    color: '#facc15',
-    padding: '2px 6px',
-    borderRadius: '4px',
-    marginTop: '4px'
+  bankInfoBox: {
+    background: 'rgba(56, 189, 248, 0.1)',
+    border: '1px solid rgba(56, 189, 248, 0.2)',
+    padding: '10px',
+    borderRadius: '10px',
+    marginBottom: '12px'
   },
-  payBadge: {
-    padding: '6px 12px',
+  receiptCard: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    background: 'rgba(0,0,0,0.3)',
+    padding: '8px',
     borderRadius: '8px',
-    fontSize: '12px',
+    marginBottom: '6px'
+  },
+  approveBtn: {
+    background: '#22c55e',
+    color: '#fff',
+    border: 'none',
+    padding: '4px 10px',
+    borderRadius: '6px',
+    fontSize: '11px',
     fontWeight: 'bold',
     cursor: 'pointer'
-  },
-  payBadgeReadOnly: {
-    fontSize: '13px',
-    fontWeight: 'bold'
   }
 };
 
